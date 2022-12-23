@@ -3,22 +3,37 @@ use std::env;
 use std::net::Ipv4Addr;
 use std::process::{self, Command};
 use std::str::FromStr;
-fn run_iptables(arguments: &String) -> (Vec<u8>, i32) {
-    let output = Command::new("iptables")
-        .arg(arguments)
-        .output()
-        .expect("iptables should be installed");
+
+const IPTABLES: &str = "iptables";
+const IPTABLES_SAVE: &str = "iptables-save";
+const IPTABLES_RESTORE: &str = "iptables-restore";
+
+fn run_cmd(command: &String, arguments: &String) -> Result<process::Output, std::io::Error> {
+    Command::new(command).arg(arguments).output()
+}
+
+fn save_iptables_rules(){
+    run_cmd(&IPTABLES_SAVE.to_string(), &"".to_string());
+}
+
+fn restore_iptables_rules(){
+    run_cmd(&IPTABLES_RESTORE.to_string(), &"".to_string());
+}
+
+fn run_iptables(arguments: &String) -> Result<(Vec<u8>, i32), std::io::Error> {
+    let output = run_cmd(&IPTABLES.to_string(), &arguments)?;
     let exit_code = output
         .status
         .code()
         .expect("Process should have exit status code");
     if output.status.success() {
-        return (output.stdout.to_ascii_lowercase(), exit_code);
+        return Ok((output.stdout.to_ascii_lowercase(), exit_code));
     }
-    return (output.stderr.to_ascii_lowercase(), exit_code);
+    return Ok((output.stderr.to_ascii_lowercase(), exit_code));
 }
 
 fn validate_arguments(args: &Vec<String>) {
+    // IT is a very bad idea to exit with process::exit since nothing is cleaned up
     if args.len() != 3 {
         eprintln!("Incorrect number of arguments");
         process::exit(exitcode::DATAERR);
@@ -36,23 +51,21 @@ fn validate_arguments(args: &Vec<String>) {
         }
     };
 }
-fn form_arguments(args: &Vec<String>) -> String {
-    let ip_address = &args[2];
-    let argumets_string: String;
-    if args[1] == "unban" {
-        argumets_string = "-L".to_string();
-    } else {
-        // dropping all conections from given IP address
-        argumets_string = format!("-A INPUT -s {} -j DROP", ip_address);
+
+fn perform_action(action: &String, ip_address: &String){
+    if action == "ban"{
+        run_iptables(&format!("-A INPUT -s {} -j DROP", ip_address));
+        run_iptables(&format!("-A OUTPUT -d {} -j DROP", ip_address));
+    }else if action == "unban" {
+        run_iptables(&format!("-D INPUT -s {} -j DROP", ip_address));
+        run_iptables(&format!("-D OUTPUT -d {} -j DROP", ip_address));
     }
-    return argumets_string;
+    save_iptables_rules();
 }
+
 
 fn main() {
     let args: Vec<String> = env::args().collect();
     validate_arguments(&args);
-    let argumets = form_arguments(&args);
-    let cmd_result = run_iptables(&argumets);
-    let out_string = String::from_utf8(cmd_result.0).expect("Could not read iptable output");
-    println!("{out_string}");
+    perform_action(&args[1], &args[2]);
 }
