@@ -1,9 +1,9 @@
 use exitcode;
 use std::env;
+use std::io;
 use std::net::Ipv4Addr;
 use std::process::{self, Command};
 use std::str::FromStr;
-
 const IPTABLES: &str = "iptables";
 const IPTABLES_SAVE: &str = "iptables-save";
 const IPTABLES_RESTORE: &str = "iptables-restore";
@@ -12,12 +12,14 @@ fn run_cmd(command: &String, arguments: &String) -> Result<process::Output, std:
     Command::new(command).arg(arguments).output()
 }
 
-fn save_iptables_rules(){
-    run_cmd(&IPTABLES_SAVE.to_string(), &"".to_string());
+fn save_iptables_rules() -> Result<(), io::Error> {
+    run_cmd(&IPTABLES_SAVE.to_string(), &"".to_string())?;
+    return Ok(());
 }
 
-fn restore_iptables_rules(){
-    run_cmd(&IPTABLES_RESTORE.to_string(), &"".to_string());
+fn restore_iptables_rules() -> Result<(), io::Error> {
+    run_cmd(&IPTABLES_RESTORE.to_string(), &"".to_string())?;
+    return Ok(());
 }
 
 fn run_iptables(arguments: &String) -> Result<(Vec<u8>, i32), std::io::Error> {
@@ -25,7 +27,7 @@ fn run_iptables(arguments: &String) -> Result<(Vec<u8>, i32), std::io::Error> {
     let exit_code = output
         .status
         .code()
-        .expect("Process should have exit status code");
+        .expect("Process must have an exit status code");
     if output.status.success() {
         return Ok((output.stdout.to_ascii_lowercase(), exit_code));
     }
@@ -52,20 +54,28 @@ fn validate_arguments(args: &Vec<String>) {
     };
 }
 
-fn perform_action(action: &String, ip_address: &String){
-    if action == "ban"{
-        run_iptables(&format!("-A INPUT -s {} -j DROP", ip_address));
-        run_iptables(&format!("-A OUTPUT -d {} -j DROP", ip_address));
-    }else if action == "unban" {
-        run_iptables(&format!("-D INPUT -s {} -j DROP", ip_address));
-        run_iptables(&format!("-D OUTPUT -d {} -j DROP", ip_address));
+fn perform_action(action: &String, ip_address: &String) -> Result<(), std::io::Error> {
+    if action == "ban" {
+        run_iptables(&format!("-A INPUT -s {} -j DROP", ip_address))?;
+        run_iptables(&format!("-A OUTPUT -d {} -j DROP", ip_address))?;
+    } else if action == "unban" {
+        run_iptables(&format!("-D INPUT -s {} -j DROP", ip_address))?;
+        run_iptables(&format!("-D OUTPUT -d {} -j DROP", ip_address))?;
     }
-    save_iptables_rules();
+    save_iptables_rules()?;
+    return Ok(());
 }
 
-
-fn main() {
+fn main(){
     let args: Vec<String> = env::args().collect();
     validate_arguments(&args);
-    perform_action(&args[1], &args[2]);
+    let action_result = perform_action(&args[1], &args[2]);
+    match action_result {
+        Ok(_) => {
+            println!("Success");
+        }
+        Err(err) => {
+            eprintln!("{}", err);
+        }
+    }
 }
