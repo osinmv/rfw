@@ -36,6 +36,7 @@ fn run_iptables(arguments: &String) -> Result<(Vec<u8>, i32), std::io::Error> {
 
 fn validate_arguments(args: &Vec<String>) {
     // IT is a very bad idea to exit with process::exit since nothing is cleaned up
+    // Should comeup with something better
     if args.len() != 3 {
         eprintln!("Incorrect number of arguments");
         process::exit(exitcode::DATAERR);
@@ -66,16 +67,20 @@ fn perform_action(action: &String, ip_address: &String) -> Result<(), std::io::E
     return Ok(());
 }
 
-fn main(){
+fn main() {
+    // the code is so terrible, using 3 types of handling errors
+    // exiting process without cleaning up
+    // using expect and Result<T,E>
+    // break my hands for it
     let args: Vec<String> = env::args().collect();
     validate_arguments(&args);
     let action_result = perform_action(&args[1], &args[2]);
     match action_result {
-        Ok(_) => {
-            println!("Success");
-        }
+        Ok(_) => {}
         Err(err) => {
             eprintln!("{}", err);
+            restore_iptables_rules().expect("Couldn't restore previous iptables rules");
+            eprintln!("Restored previous iptables rules");
         }
     }
 }
