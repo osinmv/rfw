@@ -1,5 +1,6 @@
 use exitcode;
 use std::env;
+use std::error;
 use std::io;
 use std::net::Ipv4Addr;
 use std::process::{self, Command};
@@ -34,24 +35,28 @@ fn run_iptables(arguments: &String) -> Result<(Vec<u8>, i32), std::io::Error> {
     return Ok((output.stderr.to_ascii_lowercase(), exit_code));
 }
 
-fn validate_arguments(args: &Vec<String>) {
+fn validate_arguments(args: &Vec<String>) -> Result<(), &'static str> {
     // IT is a very bad idea to exit with process::exit since nothing is cleaned up
     // Should comeup with something better
     if args.len() != 3 {
-        eprintln!("Incorrect number of arguments");
-        process::exit(exitcode::DATAERR);
+        return Err("Incorrect number of arguments");
     }
     if args[1] != "unban" && args[1] != "ban" {
-        eprintln!("Unknown command {}", args[1]);
-        process::exit(exitcode::DATAERR);
+        return Err("Unknown command");
     }
     match Ipv4Addr::from_str(&args[2]) {
         // on success do nothing
         Ok(_) => {}
-        Err(e) => {
-            eprintln!("{}", e);
-            process::exit(exitcode::DATAERR);
+        Err(_) => {
+            return Err("Couldn't parse Ip Address");
         }
+    };
+    return Ok(());
+}
+fn check_iptables_existance() -> bool {
+    match run_iptables(&"-V".to_string()) {
+        Ok(_) => return true,
+        Err(_) => return false,
     };
 }
 
@@ -73,14 +78,18 @@ fn main() {
     // using expect and Result<T,E>
     // break my hands for it
     let args: Vec<String> = env::args().collect();
-    validate_arguments(&args);
-    let action_result = perform_action(&args[1], &args[2]);
-    match action_result {
+    match validate_arguments(&args) {
+        Ok(_) => {}
+        Err(err) => {
+            eprintln!("{}", err);
+            return;
+        }
+    }
+    match perform_action(&args[1], &args[2]) {
         Ok(_) => {}
         Err(err) => {
             eprintln!("{}", err);
             restore_iptables_rules().expect("Couldn't restore previous iptables rules");
-            eprintln!("Restored previous iptables rules");
         }
     }
 }
