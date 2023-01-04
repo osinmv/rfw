@@ -5,6 +5,7 @@ use std::io;
 use std::net::Ipv4Addr;
 use std::process::{self, Command};
 use std::str::FromStr;
+
 const IPTABLES: &str = "iptables";
 const IPTABLES_SAVE: &str = "iptables-save";
 const IPTABLES_RESTORE: &str = "iptables-restore";
@@ -73,9 +74,7 @@ fn perform_action(action: &String, ip_address: &String) -> Result<(), std::io::E
 }
 
 fn main() {
-    // the code is so terrible, using 3 types of handling errors
-    // exiting process without cleaning up
-    // using expect and Result<T,E>
+    // the code is so terrible, using 2 types of handling errors
     // break my hands for it
     let args: Vec<String> = env::args().collect();
     match validate_arguments(&args) {
