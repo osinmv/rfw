@@ -10,12 +10,18 @@ pub fn run(action: &String, ip_address: &String) -> Result<(), io::Error> {
     return Ok(());
 }
 fn unban(ip_address: &String) -> Result<(), io::Error> {
-    iptables::run(&format!("-D INPUT -s {} -j DROP", ip_address))?;
-    iptables::run(&format!("-D OUTPUT -s {} -j DROP", ip_address))?;
+    // should add a function in iptables which generates these arguments
+    let input_table_args = vec!["-D", "INPUT", "-s", &ip_address, "-j", "DROP"];
+    let output_table_args = vec!["-D", "OUTPUT", "-d", &ip_address, "-j", "DROP"];
+    iptables::run(input_table_args)?;
+    iptables::run(output_table_args)?;
     return Ok(());
 }
 fn ban(ip_address: &String) -> Result<(), io::Error> {
-    iptables::run(&format!("-A INPUT -s {} -j DROP", ip_address))?;
-    iptables::run(&format!("-A OUTPUT -s {} -j DROP", ip_address))?;
+    // should add a function in iptables which generates these arguments
+    let input_table_args = vec!["-A", "INPUT", "-s", &ip_address, "-j", "DROP"];
+    let output_table_args = vec!["-A", "OUTPUT", "-d", &ip_address, "-j", "DROP"];
+    iptables::run(input_table_args)?;
+    iptables::run(output_table_args)?;
     return Ok(());
 }

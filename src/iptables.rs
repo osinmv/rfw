@@ -1,13 +1,26 @@
+use exitcode;
 use std::io;
 use std::process::Command;
 const IPTABLES: &str = "iptables";
 //const IPTABLES_SAVE: &str = "iptables-save";
 //const IPTABLES_RESTORE: &str = "iptables-restore";
 
-pub fn run(arguments: &String) -> Result<(), io::Error> {
-    let output = Command::new(&IPTABLES).arg(arguments).output();
+pub fn run(arguments: Vec<&str>) -> Result<(), io::Error> {
+    let output = Command::new(&IPTABLES).args(arguments.iter()).output();
     match output {
-        Ok(_) => return Ok(()),
+        // TODO refactor using if let
+        // messy code, but should work for now
+        Ok(out) => {
+            if exitcode::is_error(out.status.code().unwrap_or(exitcode::OSERR)) {
+                return Err(io::Error::new(
+                    io::ErrorKind::NotFound,
+                    String::from_utf8(out.stderr)
+                        .unwrap_or("internal error".to_string())
+                        .as_str(),
+                ));
+            }
+            return Ok(());
+        }
         Err(e) => match e.kind() {
             io::ErrorKind::NotFound => {
                 return Err(io::Error::new(
