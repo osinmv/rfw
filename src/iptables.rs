@@ -8,7 +8,15 @@ pub fn run(arguments: &String) -> Result<(), io::Error> {
     let output = Command::new(&IPTABLES).arg(arguments).output();
     match output {
         Ok(_) => return Ok(()),
-        Err(e) => return Err(e),
+        Err(e) => match e.kind() {
+            io::ErrorKind::NotFound => {
+                return Err(io::Error::new(
+                    io::ErrorKind::NotFound,
+                    "iptables is not found",
+                ))
+            }
+            _ => return Err(e),
+        },
     }
 }
 /*
