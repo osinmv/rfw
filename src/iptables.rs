@@ -1,35 +1,37 @@
 use exitcode;
 use std::io;
-use std::process::Command;
+use std::process::{Command, Output};
 const IPTABLES: &str = "iptables";
 //const IPTABLES_SAVE: &str = "iptables-save";
 //const IPTABLES_RESTORE: &str = "iptables-restore";
 
+fn handle_iptables_errorcode(out: Output) -> Result<(), io::Error> {
+    let errorcode = out.status.code().unwrap_or(exitcode::OSERR);
+    let error = exitcode::is_error(errorcode);
+    if error {
+        return Err(io::Error::new(
+            io::ErrorKind::NotFound,
+            String::from_utf8(out.stderr)
+                .unwrap_or("internal error".to_string())
+                .as_str(),
+        ));
+    }
+    return Ok(());
+}
+fn handle_start_error(err: io::Error) -> Result<(), io::Error> {
+    match err.kind() {
+        io::ErrorKind::NotFound => Err(io::Error::new(
+            io::ErrorKind::NotFound,
+            "iptables is not found",
+        )),
+        _ => return Err(err),
+    }
+}
 pub fn run(arguments: Vec<&str>) -> Result<(), io::Error> {
     let output = Command::new(&IPTABLES).args(arguments.iter()).output();
     match output {
-        // TODO refactor using if let
-        // messy code, but should work for now
-        Ok(out) => {
-            if exitcode::is_error(out.status.code().unwrap_or(exitcode::OSERR)) {
-                return Err(io::Error::new(
-                    io::ErrorKind::NotFound,
-                    String::from_utf8(out.stderr)
-                        .unwrap_or("internal error".to_string())
-                        .as_str(),
-                ));
-            }
-            return Ok(());
-        }
-        Err(e) => match e.kind() {
-            io::ErrorKind::NotFound => {
-                return Err(io::Error::new(
-                    io::ErrorKind::NotFound,
-                    "iptables is not found",
-                ))
-            }
-            _ => return Err(e),
-        },
+        Ok(out) => handle_iptables_errorcode(out),
+        Err(e) => handle_start_error(e),
     }
 }
 /*
